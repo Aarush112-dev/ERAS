@@ -1,0 +1,6 @@
+{
+  "name": "ERAS — Progressive Visual History",
+  "description": "An immersive cinematic scroll-driven journey through human civilization, told entirely through layered visual transformations, parallax depth, and atmospheric progression.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
