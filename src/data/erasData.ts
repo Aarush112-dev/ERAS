@@ -1,26 +1,46 @@
 import { HistoricalSequenceSpec } from '../types/eras';
 
-export const IMAGES = {
-  editionsPrimordialOchre: '/src/assets/images/eras_editions_primordial_ochre_1791627239344.jpg',
-  editionsNeolithicClay: '/src/assets/images/eras_editions_neolithic_clay_1791627250049.jpg',
-  editionsBronzeZiggurat: '/src/assets/images/eras_editions_bronze_ziggurat_1791627261017.jpg',
-  editionsSilkroadArch: '/src/assets/images/eras_editions_silkroad_arch_1791627272958.jpg',
-  editionsRenaissanceAstrolabe: '/src/assets/images/eras_editions_renaissance_astrolabe_1791627283469.jpg',
-  editionsIndustrialFlywheel: '/src/assets/images/eras_editions_industrial_flywheel_1791627294239.jpg',
-  editionsModernGrid: '/src/assets/images/eras_editions_modern_grid_1791627304533.jpg',
-  editionsOrbitalHorizon: '/src/assets/images/eras_editions_orbital_horizon_1791627314739.jpg',
+import editionsPrimordialOchre from '../assets/images/eras_editions_primordial_ochre_1791627239344.jpg';
+import editionsNeolithicClay from '../assets/images/eras_editions_neolithic_clay_1791627250049.jpg';
+import editionsBronzeZiggurat from '../assets/images/eras_editions_bronze_ziggurat_1791627261017.jpg';
+import editionsSilkroadArch from '../assets/images/eras_editions_silkroad_arch_1791627272958.jpg';
+import editionsRenaissanceAstrolabe from '../assets/images/eras_editions_renaissance_astrolabe_1791627283469.jpg';
+import editionsIndustrialFlywheel from '../assets/images/eras_editions_industrial_flywheel_1791627294239.jpg';
+import editionsModernGrid from '../assets/images/eras_editions_modern_grid_1791627304533.jpg';
+import editionsOrbitalHorizon from '../assets/images/eras_editions_orbital_horizon_1791627314739.jpg';
 
-  wilderness: '/src/assets/images/eras_untouched_wilderness_1791624956719.jpg',
-  prehistoricVista: '/src/assets/images/eras_prehistoric_dawn_1791025008325.jpg',
-  neolithicVista: '/src/assets/images/eras_neolithic_agriculture_1791624972423.jpg',
-  earlyCivilisationVista: '/src/assets/images/eras_ancient_settlement_1791025020469.jpg',
-  classicalAntiquity: '/src/assets/images/eras_classical_antiquity_1791624985040.jpg',
-  medievalVista: '/src/assets/images/eras_medieval_silkroad_1791025031523.jpg',
-  earlyModernObservatory: '/src/assets/images/eras_early_modern_observatory_1791625002475.jpg',
-  industrialSteam: '/src/assets/images/eras_industrial_steam_1791025042401.jpg',
-  electrification: '/src/assets/images/eras_electrification_metropolis_1791625014290.jpg',
-  digitalMegacity: '/src/assets/images/eras_digital_megacity_1791625027311.jpg',
-  spaceOrbit: '/src/assets/images/eras_modern_space_orbit_1791025053180.jpg',
+import wilderness from '../assets/images/eras_untouched_wilderness_1791624956719.jpg';
+import prehistoricVista from '../assets/images/eras_prehistoric_dawn_1791025008325.jpg';
+import neolithicVista from '../assets/images/eras_neolithic_agriculture_1791624972423.jpg';
+import earlyCivilisationVista from '../assets/images/eras_ancient_settlement_1791025020469.jpg';
+import classicalAntiquity from '../assets/images/eras_classical_antiquity_1791624985040.jpg';
+import medievalVista from '../assets/images/eras_medieval_silkroad_1791025031523.jpg';
+import earlyModernObservatory from '../assets/images/eras_early_modern_observatory_1791625002475.jpg';
+import industrialSteam from '../assets/images/eras_industrial_steam_1791025042401.jpg';
+import electrification from '../assets/images/eras_electrification_metropolis_1791625014290.jpg';
+import digitalMegacity from '../assets/images/eras_digital_megacity_1791625027311.jpg';
+import spaceOrbit from '../assets/images/eras_modern_space_orbit_1791025053180.jpg';
+
+export const IMAGES = {
+  editionsPrimordialOchre,
+  editionsNeolithicClay,
+  editionsBronzeZiggurat,
+  editionsSilkroadArch,
+  editionsRenaissanceAstrolabe,
+  editionsIndustrialFlywheel,
+  editionsModernGrid,
+  editionsOrbitalHorizon,
+  wilderness,
+  prehistoricVista,
+  neolithicVista,
+  earlyCivilisationVista,
+  classicalAntiquity,
+  medievalVista,
+  earlyModernObservatory,
+  industrialSteam,
+  electrification,
+  digitalMegacity,
+  spaceOrbit,
 };
 
 const RAW_SEQUENCES: Omit<HistoricalSequenceSpec, 'index' | 'startVh' | 'endVh'>[] = [
