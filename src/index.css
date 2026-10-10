@@ -1,10 +1,15 @@
 @import "tailwindcss";
 
 @layer base {
+  html,
   body {
     font-family: 'Plus Jakarta Sans', sans-serif;
-    background-color: #050505;
+    background-color: #000000;
     color: #e5e5e5;
+    overflow-x: hidden;
+    overflow-y: auto;
+    margin: 0;
+    padding: 0;
     user-select: none;
     -webkit-user-select: none;
   }
@@ -14,21 +19,17 @@
   font-family: 'Cinzel', Georgia, serif;
 }
 
-/* Custom cinematic vignette and blend modes */
-.mask-radial-vignette {
-  mask-image: radial-gradient(circle at center, black 65%, transparent 100%);
-  -webkit-mask-image: radial-gradient(circle at center, black 65%, transparent 100%);
-}
-
-/* Hide scrollbar for immersive feel */
+/* Subtle dark vertical scrollbar */
 ::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #000;
+  background: #050505;
 }
 ::-webkit-scrollbar-thumb {
-  background: #333;
-  border-radius: 2px;
+  background: #262626;
+  border-radius: 3px;
 }
-
+::-webkit-scrollbar-thumb:hover {
+  background: #404040;
+}

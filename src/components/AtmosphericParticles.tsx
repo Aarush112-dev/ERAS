@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { HISTORICAL_SEQUENCES } from '../data/erasData';
 
 interface Particle {
   x: number;
@@ -8,19 +9,21 @@ interface Particle {
   speedY: number;
   opacity: number;
   color: string;
-  depth: number; // 0 to 1 (0 = far, 1 = extreme foreground)
+  depth: number; // 0.2 (distant atmosphere) to 1.25 (extreme foreground)
   life: number;
   maxLife: number;
 }
 
 interface AtmosphericParticlesProps {
-  progress: number;
+  sequenceIndex: number;
+  sectionProgress: number;
   mouseOffset: { x: number; y: number };
   isReducedMotion: boolean;
 }
 
 export const AtmosphericParticles: React.FC<AtmosphericParticlesProps> = ({
-  progress,
+  sequenceIndex,
+  sectionProgress,
   mouseOffset,
   isReducedMotion,
 }) => {
@@ -43,48 +46,62 @@ export const AtmosphericParticles: React.FC<AtmosphericParticlesProps> = ({
     };
     window.addEventListener('resize', handleResize);
 
-    // Generate particles
-    const particleCount = isReducedMotion ? 25 : 90;
+    const particleCount = isReducedMotion ? 20 : 85;
     const particles: Particle[] = [];
 
-    const getParticlePalette = (prog: number) => {
-      if (prog < 0.25) {
-        // Prehistoric: warm orange sparks & white mist
-        return ['rgba(245, 158, 11, ', 'rgba(251, 191, 36, ', 'rgba(217, 119, 6, ', 'rgba(255, 237, 213, '];
-      } else if (prog < 0.5) {
-        // Ancient: golden dust, warm yellow motes
-        return ['rgba(234, 179, 8, ', 'rgba(250, 204, 21, ', 'rgba(217, 119, 6, ', 'rgba(254, 240, 138, '];
-      } else if (prog < 0.75) {
-        // Medieval: amber lantern glow & river mist
-        return ['rgba(251, 146, 60, ', 'rgba(56, 189, 248, ', 'rgba(224, 231, 255, ', 'rgba(253, 186, 116, '];
-      } else if (prog < 0.88) {
-        // Industrial: dark soot flakes & orange embers
-        return ['rgba(120, 113, 108, ', 'rgba(234, 88, 12, ', 'rgba(75, 85, 99, ', 'rgba(254, 215, 170, '];
-      } else {
-        // Space / Cosmic: cyan, ice blue, starlight white
-        return ['rgba(255, 255, 255, ', 'rgba(147, 197, 253, ', 'rgba(96, 165, 250, ', 'rgba(191, 219, 254, '];
+    const getPaletteForType = (type: string): string[] => {
+      switch (type) {
+        case 'mist':
+          return ['rgba(203, 213, 225, ', 'rgba(148, 163, 184, ', 'rgba(241, 245, 249, '];
+        case 'embers':
+          return ['rgba(245, 158, 11, ', 'rgba(251, 191, 36, ', 'rgba(234, 88, 12, ', 'rgba(254, 243, 199, '];
+        case 'pollen':
+          return ['rgba(253, 224, 71, ', 'rgba(250, 204, 21, ', 'rgba(254, 249, 195, '];
+        case 'dust':
+          return ['rgba(234, 179, 8, ', 'rgba(217, 119, 6, ', 'rgba(254, 240, 138, '];
+        case 'lanterns':
+          return ['rgba(251, 146, 60, ', 'rgba(245, 158, 11, ', 'rgba(254, 215, 170, '];
+        case 'sparks':
+          return ['rgba(253, 224, 71, ', 'rgba(191, 219, 254, ', 'rgba(251, 191, 36, '];
+        case 'smoke':
+          return ['rgba(168, 162, 158, ', 'rgba(234, 88, 12, ', 'rgba(120, 113, 108, ', 'rgba(253, 186, 116, '];
+        case 'electric':
+          return ['rgba(250, 204, 21, ', 'rgba(254, 240, 138, ', 'rgba(125, 211, 252, '];
+        case 'data':
+          return ['rgba(56, 189, 248, ', 'rgba(14, 165, 233, ', 'rgba(186, 230, 253, '];
+        case 'stars':
+        default:
+          return ['rgba(255, 255, 255, ', 'rgba(191, 219, 254, ', 'rgba(147, 197, 253, '];
       }
     };
 
+    const currentSeq = HISTORICAL_SEQUENCES[sequenceIndex] || HISTORICAL_SEQUENCES[0];
+    const pType = currentSeq.atmosphere.particleType;
+
     const createParticle = (): Particle => {
-      const palette = getParticlePalette(progress);
+      const palette = getPaletteForType(pType);
       const colorBase = palette[Math.floor(Math.random() * palette.length)];
-      const depth = 0.2 + Math.random() * 0.8;
-      const isSpace = progress > 0.85;
+      const depth = 0.25 + Math.random() * 1.0; // up to 1.25x foreground parallax
+      const isSpace = pType === 'stars';
+      const isMist = pType === 'mist' || pType === 'smoke';
 
       return {
         x: Math.random() * width,
         y: Math.random() * height,
-        size: isSpace ? 0.6 + Math.random() * 2.2 * depth : 1.2 + Math.random() * 3.5 * depth,
-        speedX: (Math.random() - 0.45) * (0.4 + depth * 0.8),
+        size: isSpace
+          ? 0.6 + Math.random() * 1.9 * depth
+          : isMist
+          ? 2.2 + Math.random() * 5.5 * depth
+          : 1.0 + Math.random() * 3.0 * depth,
+        speedX: (Math.random() - 0.42) * (0.3 + depth * 0.6),
         speedY: isSpace
-          ? (Math.random() - 0.5) * 0.2
-          : -0.2 - Math.random() * (0.6 + depth * 0.9), // drift upward like smoke/embers
-        opacity: 0.1 + Math.random() * 0.7,
+          ? (Math.random() - 0.5) * 0.12
+          : -0.15 - Math.random() * (0.45 + depth * 0.7),
+        opacity: 0.12 + Math.random() * 0.65,
         color: colorBase,
         depth,
-        life: 0,
-        maxLife: 200 + Math.random() * 300,
+        life: Math.floor(Math.random() * 120),
+        maxLife: 220 + Math.random() * 320,
       };
     };
 
@@ -95,49 +112,43 @@ export const AtmosphericParticles: React.FC<AtmosphericParticlesProps> = ({
     const render = () => {
       ctx.clearRect(0, 0, width, height);
 
-      const palette = getParticlePalette(progress);
-      const isSpace = progress > 0.85;
+      const isSpace = pType === 'stars';
 
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i];
         p.life++;
 
-        if (p.life > p.maxLife || p.y < -20 || p.x < -20 || p.x > width + 20) {
+        if (p.life > p.maxLife || p.y < -30 || p.x < -30 || p.x > width + 30) {
           particles[i] = createParticle();
           continue;
         }
 
-        // Parallax displacement based on mouse and particle depth
-        const parallaxX = mouseOffset.x * p.depth * 35;
-        const parallaxY = mouseOffset.y * p.depth * 30;
+        // Depth-scaled parallax from both mouse and vertical section scroll
+        const parallaxX = isReducedMotion ? 0 : mouseOffset.x * p.depth * 34;
+        const parallaxY = isReducedMotion
+          ? 0
+          : mouseOffset.y * p.depth * 26 - (sectionProgress - 0.5) * p.depth * 90;
 
-        p.x += p.speedX;
-        p.y += p.speedY;
+        if (!isReducedMotion) {
+          p.x += p.speedX;
+          p.y += p.speedY;
+        }
 
-        // Fade in and out
         const lifeRatio = p.life / p.maxLife;
-        const currentOpacity =
-          p.opacity * Math.sin(lifeRatio * Math.PI) * (isSpace ? 0.9 : 0.75);
+        const currentOpacity = p.opacity * Math.sin(lifeRatio * Math.PI) * (isSpace ? 0.92 : 0.72);
+
+        const drawX = (p.x + parallaxX + width) % width;
+        const drawY = (p.y + parallaxY + height) % height;
 
         ctx.fillStyle = `${p.color}${currentOpacity})`;
         ctx.beginPath();
-
-        const drawX = p.x + parallaxX;
-        const drawY = p.y + parallaxY;
-
-        if (isSpace && Math.random() > 0.98) {
-          // Twinkle / glint for space stars
-          ctx.arc(drawX, drawY, p.size * 1.6, 0, Math.PI * 2);
-        } else {
-          ctx.arc(drawX, drawY, p.size, 0, Math.PI * 2);
-        }
+        ctx.arc(drawX, drawY, p.size, 0, Math.PI * 2);
         ctx.fill();
 
-        // Subtle glow halo for extreme foreground embers/stars
-        if (p.depth > 0.75 && !isReducedMotion) {
-          ctx.fillStyle = `${p.color}${currentOpacity * 0.25})`;
+        if (p.depth > 0.85 && !isReducedMotion) {
+          ctx.fillStyle = `${p.color}${currentOpacity * 0.22})`;
           ctx.beginPath();
-          ctx.arc(drawX, drawY, p.size * 2.8, 0, Math.PI * 2);
+          ctx.arc(drawX, drawY, p.size * 2.6, 0, Math.PI * 2);
           ctx.fill();
         }
       }
@@ -151,7 +162,7 @@ export const AtmosphericParticles: React.FC<AtmosphericParticlesProps> = ({
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', handleResize);
     };
-  }, [progress, mouseOffset, isReducedMotion]);
+  }, [sequenceIndex, sectionProgress, mouseOffset, isReducedMotion]);
 
   return (
     <canvas

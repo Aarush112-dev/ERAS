@@ -1,195 +1,169 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { HistoricalCanvas } from './components/HistoricalCanvas';
 import { AtmosphericParticles } from './components/AtmosphericParticles';
 import { MinimalHud } from './components/MinimalHud';
+import { HISTORICAL_SEQUENCES, TOTAL_DOCUMENT_VH } from './data/erasData';
 import { audioEngine } from './engine/audioEngine';
 
 export default function App() {
-  // Master timeline progress: 0.0 to 1.0
-  const [targetProgress, setTargetProgress] = useState<number>(0);
-  const [currentProgress, setCurrentProgress] = useState<number>(0);
+  // Deterministic scroll-mapped state
+  const [sequenceIndex, setSequenceIndex] = useState<number>(0);
+  const [sectionProgress, setSectionProgress] = useState<number>(0);
+  const [globalProgress, setGlobalProgress] = useState<number>(0);
 
-  // Mouse tracking for 2.5D parallax and detail lens
+  // Subtle mouse perspective for multi-layer parallax
   const [mouseOffset, setMouseOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [lensPosition, setLensPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Interactive modes
+  // Accessibility & environmental sound controls
   const [isPlayingSound, setIsPlayingSound] = useState<boolean>(false);
-  const [isAutoVoyage, setIsAutoVoyage] = useState<boolean>(false);
-  const [lensActive, setLensActive] = useState<boolean>(false);
-  const [showAnchorReticle, setShowAnchorReticle] = useState<boolean>(true);
-  const [isReducedMotion, setIsReducedMotion] = useState<boolean>(false);
-  const [hasInteracted, setHasInteracted] = useState<boolean>(false);
+  const [isReducedMotion, setIsReducedMotion] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+    return false;
+  });
 
-  const touchStartY = useRef<number>(0);
-  const autoVoyageTimer = useRef<number | null>(null);
+  // Smoothed scroll tracking ref (settling directly to actual window.scrollY without timers)
+  const targetScrollY = useRef<number>(0);
+  const smoothedScrollY = useRef<number>(0);
 
-  // Smooth lerp loop for 60 FPS camera motion
   useEffect(() => {
-    let animId: number;
-    const lerpSpeed = isReducedMotion ? 0.15 : 0.07;
+    const updateScrollTarget = () => {
+      targetScrollY.current = window.scrollY || window.pageYOffset || 0;
+    };
+
+    updateScrollTarget();
+    smoothedScrollY.current = targetScrollY.current;
+
+    window.addEventListener('scroll', updateScrollTarget, { passive: true });
+    window.addEventListener('resize', updateScrollTarget, { passive: true });
+
+    let rafId: number;
 
     const tick = () => {
-      setCurrentProgress((prev) => {
-        const diff = targetProgress - prev;
-        if (Math.abs(diff) < 0.0001) return targetProgress;
-        const nextVal = prev + diff * lerpSpeed;
-        audioEngine.updateProgress(nextVal);
-        return nextVal;
-      });
-      animId = requestAnimationFrame(tick);
-    };
+      const diff = targetScrollY.current - smoothedScrollY.current;
+      const factor = isReducedMotion ? 0.35 : 0.14;
 
-    animId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animId);
-  }, [targetProgress, isReducedMotion]);
-
-  // Handle Wheel Events (Physical smooth scroll, fully reversible)
-  const handleWheel = useCallback((e: WheelEvent) => {
-    e.preventDefault();
-    setHasInteracted(true);
-    setIsAutoVoyage(false);
-
-    // Delta normalization
-    const delta = e.deltaY * 0.00045;
-    setTargetProgress((prev) => Math.max(0, Math.min(1, prev + delta)));
-  }, []);
-
-  // Handle Touch Events (Mobile/Tablet)
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartY.current = e.touches[0].clientY;
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    setHasInteracted(true);
-    setIsAutoVoyage(false);
-    const touchY = e.touches[0].clientY;
-    const deltaY = (touchStartY.current - touchY) * 0.002;
-    touchStartY.current = touchY;
-    setTargetProgress((prev) => Math.max(0, Math.min(1, prev + deltaY)));
-  };
-
-  // Handle Mouse Move (2.5D Parallax & Detail Lens)
-  const handleMouseMove = (e: React.MouseEvent) => {
-    const { clientX, clientY } = e;
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-
-    // Normalized from -1 to 1
-    const normX = (clientX / w) * 2 - 1;
-    const normY = (clientY / h) * 2 - 1;
-
-    setMouseOffset({ x: normX, y: normY });
-    setLensPosition({ x: clientX, y: clientY });
-  };
-
-  // Keyboard navigation & Shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-        setHasInteracted(true);
-        setIsAutoVoyage(false);
-        setTargetProgress((prev) => Math.min(1, prev + 0.04));
-      } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-        setHasInteracted(true);
-        setIsAutoVoyage(false);
-        setTargetProgress((prev) => Math.max(0, prev - 0.04));
-      } else if (e.code === 'Space') {
-        e.preventDefault();
-        setHasInteracted(true);
-        setIsAutoVoyage((prev) => !prev);
-      } else if (e.key.toLowerCase() === 'm') {
-        toggleSound();
-      } else if (e.key.toLowerCase() === 'l') {
-        setLensActive((prev) => !prev);
+      if (Math.abs(diff) > 0.05) {
+        smoothedScrollY.current += diff * factor;
+      } else {
+        smoothedScrollY.current = targetScrollY.current;
       }
+
+      const vhPx = Math.max(1, window.innerHeight / 100);
+      const currentVh = Math.max(0, smoothedScrollY.current / vhPx);
+      const maxScrollableVh = Math.max(1, TOTAL_DOCUMENT_VH - 100);
+
+      // Deterministic global progress (0.0 to 1.0)
+      const normGlobal = Math.max(0, Math.min(1, currentVh / maxScrollableVh));
+
+      // Locate active sequence from currentVh
+      let activeIdx = HISTORICAL_SEQUENCES.length - 1;
+      for (let i = 0; i < HISTORICAL_SEQUENCES.length; i++) {
+        const seq = HISTORICAL_SEQUENCES[i];
+        if (currentVh >= seq.startVh && currentVh < seq.endVh) {
+          activeIdx = i;
+          break;
+        }
+      }
+
+      const activeSeq = HISTORICAL_SEQUENCES[activeIdx];
+      // For the last section, account for viewport height so it reaches 1.0 cleanly at bottom of page
+      const effectiveLengthVh =
+        activeIdx === HISTORICAL_SEQUENCES.length - 1
+          ? Math.max(100, activeSeq.scrollHeightVh - 100)
+          : activeSeq.scrollHeightVh;
+
+      const normSection = Math.max(
+        0,
+        Math.min(1, (currentVh - activeSeq.startVh) / effectiveLengthVh)
+      );
+
+      setSequenceIndex(activeIdx);
+      setSectionProgress(normSection);
+      setGlobalProgress(normGlobal);
+
+      audioEngine.updateProgress(normGlobal);
+
+      rafId = requestAnimationFrame(tick);
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+    rafId = requestAnimationFrame(tick);
 
-  // Mount wheel listener to window with passive: false to prevent default page scrolling
-  useEffect(() => {
-    window.addEventListener('wheel', handleWheel, { passive: false });
-    return () => window.removeEventListener('wheel', handleWheel);
-  }, [handleWheel]);
-
-  // Auto-Voyage loop (Cinematic continuous historical playback)
-  useEffect(() => {
-    if (isAutoVoyage) {
-      autoVoyageTimer.current = window.setInterval(() => {
-        setTargetProgress((prev) => {
-          if (prev >= 1) {
-            setIsAutoVoyage(false);
-            return 1;
-          }
-          return prev + 0.0015;
-        });
-      }, 30);
-    } else {
-      if (autoVoyageTimer.current) clearInterval(autoVoyageTimer.current);
-    }
     return () => {
-      if (autoVoyageTimer.current) clearInterval(autoVoyageTimer.current);
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('scroll', updateScrollTarget);
+      window.removeEventListener('resize', updateScrollTarget);
     };
-  }, [isAutoVoyage]);
+  }, [isReducedMotion]);
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isReducedMotion) return;
+    const w = Math.max(1, window.innerWidth);
+    const h = Math.max(1, window.innerHeight);
+    const normX = (e.clientX / w) * 2 - 1;
+    const normY = (e.clientY / h) * 2 - 1;
+    setMouseOffset({ x: normX, y: normY });
+  };
 
   const toggleSound = () => {
-    setHasInteracted(true);
     const active = audioEngine.toggleMute();
     setIsPlayingSound(active);
   };
 
-  const handleSeek = (pos: number) => {
-    setHasInteracted(true);
-    setIsAutoVoyage(false);
-    setTargetProgress(pos);
-  };
-
   return (
-    <main
-      className="relative w-screen h-screen overflow-hidden bg-black text-white select-none cursor-crosshair"
+    <div
+      className="relative w-full bg-black text-white select-none"
       onMouseMove={handleMouseMove}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
     >
-      {/* 2.5D Canvas Composite Transformation Engine */}
-      <HistoricalCanvas
-        progress={currentProgress}
-        mouseOffset={mouseOffset}
-        isReducedMotion={isReducedMotion}
-        lensActive={lensActive}
-        lensPosition={lensPosition}
-        showAnchorReticle={showAnchorReticle}
-      />
+      {/* =========================================================================
+          FIXED FULL-VIEWPORT VISUAL STAGE
+          Remains anchored in viewport while native vertical document scrolls
+      ========================================================================= */}
+      <div className="fixed inset-0 w-full h-screen overflow-hidden z-10 pointer-events-none">
+        <HistoricalCanvas
+          sequenceIndex={sequenceIndex}
+          sectionProgress={sectionProgress}
+          globalProgress={globalProgress}
+          mouseOffset={mouseOffset}
+          isReducedMotion={isReducedMotion}
+        />
 
-      {/* Multi-depth Atmospheric Particles (Embers, Mist, Soot, Cosmic Dust) */}
-      <AtmosphericParticles
-        progress={currentProgress}
-        mouseOffset={mouseOffset}
-        isReducedMotion={isReducedMotion}
-      />
+        <AtmosphericParticles
+          sequenceIndex={sequenceIndex}
+          sectionProgress={sectionProgress}
+          mouseOffset={mouseOffset}
+          isReducedMotion={isReducedMotion}
+        />
+      </div>
 
-      {/* Ultra-minimal, Non-intrusive Cinematic HUD */}
+      {/* =========================================================================
+          SHOPIFY EDITIONS-STYLE EDITORIAL NARRATIVE & CONTROLS
+      ========================================================================= */}
       <MinimalHud
-        progress={currentProgress}
-        onSeek={handleSeek}
+        sequenceIndex={sequenceIndex}
+        sectionProgress={sectionProgress}
+        globalProgress={globalProgress}
         isPlayingSound={isPlayingSound}
         onToggleSound={toggleSound}
-        isAutoVoyage={isAutoVoyage}
-        onToggleAutoVoyage={() => {
-          setHasInteracted(true);
-          setIsAutoVoyage((prev) => !prev);
-        }}
-        lensActive={lensActive}
-        onToggleLens={() => setLensActive((prev) => !prev)}
-        showAnchorReticle={showAnchorReticle}
-        onToggleReticle={() => setShowAnchorReticle((prev) => !prev)}
         isReducedMotion={isReducedMotion}
         onToggleReducedMotion={() => setIsReducedMotion((prev) => !prev)}
-        hasInteracted={hasInteracted}
       />
-    </main>
+
+      {/* =========================================================================
+          GENUINE VERTICAL SCROLL DOCUMENT (16,700vh across 16 Historical Sequences)
+          Works with native mouse wheel, trackpad, keyboard, touch swipe & scrollbar
+      ========================================================================= */}
+      <main className="relative z-0 w-full pointer-events-auto">
+        {HISTORICAL_SEQUENCES.map((seq) => (
+          <section
+            key={seq.id}
+            data-sequence-id={seq.id}
+            style={{ height: `${seq.scrollHeightVh}vh` }}
+            className="w-full relative"
+          />
+        ))}
+      </main>
+    </div>
   );
 }

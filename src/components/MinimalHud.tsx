@@ -1,39 +1,47 @@
 import React, { useState } from 'react';
-import { Volume2, VolumeX, Play, Pause, Search, Crosshair, Maximize, Minimize, Compass } from 'lucide-react';
-import { ERAS_DATA } from '../data/erasData';
+import {
+  Volume2,
+  VolumeX,
+  Compass,
+  Maximize,
+  Minimize,
+  BookOpen,
+  List,
+  X,
+} from 'lucide-react';
+import { HISTORICAL_SEQUENCES, TOTAL_DOCUMENT_VH } from '../data/erasData';
 
 interface MinimalHudProps {
-  progress: number;
-  onSeek: (progress: number) => void;
+  sequenceIndex: number;
+  sectionProgress: number;
+  globalProgress: number;
   isPlayingSound: boolean;
   onToggleSound: () => void;
-  isAutoVoyage: boolean;
-  onToggleAutoVoyage: () => void;
-  lensActive: boolean;
-  onToggleLens: () => void;
-  showAnchorReticle: boolean;
-  onToggleReticle: () => void;
   isReducedMotion: boolean;
   onToggleReducedMotion: () => void;
-  hasInteracted: boolean;
 }
 
+const CURATED_NAV_ANCHORS = [
+  { label: 'Origins', seqIndex: 0 },
+  { label: 'Antiquity', seqIndex: 4 },
+  { label: 'Silk Road', seqIndex: 7 },
+  { label: 'Science', seqIndex: 9 },
+  { label: 'Industry', seqIndex: 10 },
+  { label: 'Orbit', seqIndex: 14 },
+];
+
 export const MinimalHud: React.FC<MinimalHudProps> = ({
-  progress,
-  onSeek,
+  sequenceIndex,
+  sectionProgress,
+  globalProgress,
   isPlayingSound,
   onToggleSound,
-  isAutoVoyage,
-  onToggleAutoVoyage,
-  lensActive,
-  onToggleLens,
-  showAnchorReticle,
-  onToggleReticle,
   isReducedMotion,
   onToggleReducedMotion,
-  hasInteracted,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showEditorial, setShowEditorial] = useState(true);
+  const [isIndexOpen, setIsIndexOpen] = useState(false);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -45,206 +53,326 @@ export const MinimalHud: React.FC<MinimalHudProps> = ({
     }
   };
 
-  // Identify current era and transition state
-  const rawIdx = progress * (ERAS_DATA.length - 1);
-  const currentIdx = Math.min(ERAS_DATA.length - 1, Math.floor(rawIdx));
-  const nextIdx = Math.min(ERAS_DATA.length - 1, currentIdx + 1);
-  const localProg = rawIdx - currentIdx;
-  const isTransitioning = currentIdx !== nextIdx && localProg > 0.05 && localProg < 0.95;
+  const scrollToVh = (targetVh: number) => {
+    const vhPx = window.innerHeight / 100;
+    window.scrollTo({
+      top: targetVh * vhPx,
+      behavior: isReducedMotion ? 'auto' : 'smooth',
+    });
+  };
 
-  const currentEra = ERAS_DATA[currentIdx];
-  const nextEra = ERAS_DATA[nextIdx];
+  const seq = HISTORICAL_SEQUENCES[sequenceIndex] || HISTORICAL_SEQUENCES[0];
+  const { editorial, palette } = seq;
+
+  // Determine which of the 3 progressive sub-stage beats is active (0, 1, or 2)
+  const activeBeatIndex = sectionProgress < 0.34 ? 0 : sectionProgress < 0.68 ? 1 : 2;
+  const activeBeat = editorial.beats[activeBeatIndex];
+
+  // Progress within the current beat (0 to 100%)
+  const beatLocalProgress =
+    activeBeatIndex === 0
+      ? Math.min(1, sectionProgress / 0.34)
+      : activeBeatIndex === 1
+      ? Math.min(1, (sectionProgress - 0.34) / 0.34)
+      : Math.min(1, (sectionProgress - 0.68) / 0.32);
+
+  const isRightAligned = editorial.editorialAlign === 'right';
 
   return (
-    <div className="absolute inset-0 pointer-events-none z-30 flex flex-col justify-between p-6 sm:p-8 select-none">
-      {/* ================= TOP BAR ================= */}
-      <header className="flex items-center justify-between w-full pointer-events-auto">
-        {/* Brand Wordmark (Single text element in Cinzel) */}
-        <div className="flex items-center gap-3">
-          <span className="font-cinzel text-xl sm:text-2xl font-bold tracking-[0.25em] text-white/90 drop-shadow-sm">
-            ERAS
-          </span>
-          <span className="hidden md:inline-block text-[11px] font-sans tracking-widest text-neutral-400 uppercase">
-            Progressive Visual History
-          </span>
-        </div>
+    <div className="fixed inset-0 pointer-events-none z-30 flex flex-col justify-between select-none">
+      {/* =========================================================================
+          TOP BAR (3-Zone Contract: Wordmark — Editorial Nav Links — Actions)
+      ========================================================================= */}
+      <header className="w-full px-6 sm:px-10 py-5 flex items-center justify-between bg-gradient-to-b from-black/80 via-black/35 to-transparent pointer-events-auto">
+        {/* Zone 1: Single text element wordmark */}
+        <a
+          href="#top"
+          onClick={(e) => {
+            e.preventDefault();
+            scrollToVh(0);
+          }}
+          className="font-cinzel text-lg sm:text-xl font-semibold tracking-[0.28em] text-white hover:text-amber-200 transition-colors whitespace-nowrap shrink-0"
+        >
+          ERAS
+        </a>
 
-        {/* Minimal Control Cluster */}
-        <div className="flex items-center gap-2 sm:gap-3 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 shadow-lg">
-          {/* Sound Toggle */}
+        {/* Zone 2: Clean Typography Nav Links */}
+        <nav className="hidden lg:flex items-center gap-7 text-xs font-medium tracking-wider text-neutral-300">
+          {CURATED_NAV_ANCHORS.map((item) => {
+            const targetSeq = HISTORICAL_SEQUENCES[item.seqIndex];
+            const isActive =
+              sequenceIndex >= item.seqIndex &&
+              (item.seqIndex === 14 ||
+                sequenceIndex <
+                  (CURATED_NAV_ANCHORS[CURATED_NAV_ANCHORS.indexOf(item) + 1]?.seqIndex ?? 16));
+            return (
+              <button
+                key={item.label}
+                onClick={() => scrollToVh(targetSeq.startVh + 20)}
+                className={`py-1 transition-colors whitespace-nowrap shrink-0 border-b ${
+                  isActive
+                    ? 'text-white border-amber-400/80'
+                    : 'text-neutral-400 border-transparent hover:text-white hover:border-white/30'
+                }`}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Zone 3: Primary Actions & Utility Controls */}
+        <div className="flex items-center gap-2">
           <button
-            onClick={onToggleSound}
-            title={isPlayingSound ? 'Mute Ambient Sound' : 'Play Ambient Sound'}
-            className={`p-2 rounded-full transition-colors flex items-center gap-1.5 ${
-              isPlayingSound ? 'text-amber-300 hover:text-amber-200' : 'text-neutral-400 hover:text-white'
-            }`}
+            onClick={() => setIsIndexOpen((prev) => !prev)}
+            className="px-3.5 py-1.5 text-xs font-medium text-neutral-200 hover:text-white bg-white/5 hover:bg-white/10 border border-white/15 rounded-md transition-colors flex items-center gap-2 whitespace-nowrap shrink-0"
           >
-            {isPlayingSound ? <Volume2 size={16} /> : <VolumeX size={16} />}
-            {isPlayingSound && (
-              <span className="flex items-center gap-0.5 h-3">
-                <span className="w-0.5 h-2 bg-amber-400 animate-pulse" />
-                <span className="w-0.5 h-3 bg-amber-300 animate-pulse delay-75" />
-                <span className="w-0.5 h-1.5 bg-amber-400 animate-pulse delay-150" />
-              </span>
-            )}
-          </button>
-
-          <div className="w-[1px] h-4 bg-white/15" />
-
-          {/* Auto-Voyage Play / Pause */}
-          <button
-            onClick={onToggleAutoVoyage}
-            title={isAutoVoyage ? 'Pause Continuous Voyage' : 'Start Continuous Cinematic Voyage'}
-            className={`p-2 rounded-full transition-colors flex items-center gap-1.5 text-xs font-medium ${
-              isAutoVoyage ? 'text-amber-300' : 'text-neutral-400 hover:text-white'
-            }`}
-          >
-            {isAutoVoyage ? <Pause size={15} /> : <Play size={15} />}
-            <span className="hidden sm:inline text-[11px] tracking-wider uppercase font-mono">
-              {isAutoVoyage ? 'Voyage Playing' : 'Auto-Voyage'}
+            <List size={14} />
+            <span className="tabular-nums">
+              {editorial.romanNumeral} / XVI
             </span>
           </button>
 
-          <div className="w-[1px] h-4 bg-white/15" />
-
-          {/* 2.8x Detail Lens */}
           <button
-            onClick={onToggleLens}
-            title="Inspect 2.8× Micro Architectural Details"
-            className={`p-2 rounded-full transition-colors ${
-              lensActive ? 'text-amber-300 bg-white/10' : 'text-neutral-400 hover:text-white'
+            onClick={() => setShowEditorial((prev) => !prev)}
+            title={showEditorial ? 'Hide editorial narrative' : 'Show editorial narrative'}
+            aria-label={showEditorial ? 'Hide editorial narrative' : 'Show editorial narrative'}
+            className={`p-2 rounded-md border transition-colors ${
+              showEditorial
+                ? 'text-amber-300 border-amber-400/30 bg-white/5'
+                : 'text-neutral-400 border-white/10 hover:text-white'
             }`}
           >
-            <Search size={15} />
+            <BookOpen size={15} />
           </button>
 
-          {/* Anchor Reticle */}
           <button
-            onClick={onToggleReticle}
-            title="Toggle Transition Anchor Highlight"
-            className={`p-2 rounded-full transition-colors ${
-              showAnchorReticle ? 'text-amber-300 bg-white/10' : 'text-neutral-400 hover:text-white'
+            onClick={onToggleSound}
+            title={isPlayingSound ? 'Mute ambient soundscape' : 'Enable ambient soundscape'}
+            aria-label={isPlayingSound ? 'Mute ambient soundscape' : 'Enable ambient soundscape'}
+            className={`p-2 rounded-md border transition-colors ${
+              isPlayingSound
+                ? 'text-amber-300 border-amber-400/30 bg-white/5'
+                : 'text-neutral-400 border-white/10 hover:text-white'
             }`}
           >
-            <Crosshair size={15} />
+            {isPlayingSound ? <Volume2 size={15} /> : <VolumeX size={15} />}
           </button>
 
-          {/* Reduced Motion Toggle */}
           <button
             onClick={onToggleReducedMotion}
-            title={isReducedMotion ? 'Enable Full Parallax & Zoom' : 'Reduce Camera Movement'}
-            className={`p-2 rounded-full transition-colors ${
-              isReducedMotion ? 'text-amber-300 bg-white/10' : 'text-neutral-400 hover:text-white'
+            title={isReducedMotion ? 'Enable full parallax motion' : 'Reduce camera motion'}
+            aria-label={isReducedMotion ? 'Enable full parallax motion' : 'Reduce camera motion'}
+            className={`hidden sm:flex p-2 rounded-md border transition-colors ${
+              isReducedMotion
+                ? 'text-amber-300 border-amber-400/30 bg-white/5'
+                : 'text-neutral-400 border-white/10 hover:text-white'
             }`}
           >
             <Compass size={15} />
           </button>
 
-          {/* Fullscreen Toggle */}
           <button
             onClick={toggleFullscreen}
-            title="Toggle Fullscreen"
-            className="p-2 rounded-full text-neutral-400 hover:text-white transition-colors"
+            title="Toggle fullscreen"
+            aria-label="Toggle fullscreen"
+            className="hidden sm:flex p-2 rounded-md border border-white/10 text-neutral-400 hover:text-white transition-colors"
           >
             {isFullscreen ? <Minimize size={15} /> : <Maximize size={15} />}
           </button>
         </div>
       </header>
 
-      {/* ================= CENTER: TRANSITION ANCHOR BRIDGE CALLOUT ================= */}
-      {/* Shown purely during the visual transformation as the camera pushes into the anchor */}
-      <div className="flex flex-col items-center justify-center w-full pointer-events-none transition-opacity duration-500">
-        {isTransitioning && (
-          <div className="bg-black/60 backdrop-blur-md px-5 py-2.5 rounded-full border border-amber-500/30 flex items-center gap-3 text-xs tracking-wider font-mono text-amber-200/90 shadow-2xl animate-fade-in">
-            <span className="text-white/80 font-serif tracking-normal">
-              {currentEra.transitionBridge.sourceAnchorName}
-            </span>
-            <span className="text-amber-400/80">⟶</span>
-            <span className="text-amber-300 font-serif tracking-normal font-semibold">
-              {currentEra.transitionBridge.targetAnchorName}
-            </span>
-          </div>
-        )}
-
-        {/* First scroll hint (fades out permanently once interacted) */}
-        {!hasInteracted && (
-          <div className="flex flex-col items-center gap-2 text-white/70 animate-bounce duration-1000 mt-32">
-            <div className="w-5 h-8 rounded-full border border-white/40 flex justify-center p-1">
-              <div className="w-1 h-2 bg-amber-400 rounded-full animate-pulse" />
-            </div>
-            <span className="font-mono text-[10px] tracking-[0.25em] text-neutral-300 uppercase">
-              Scroll or Drag to Progress History
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* ================= BOTTOM BAR: TIMELINE SCRUBBER ================= */}
-      <footer className="w-full flex flex-col items-center gap-3 pointer-events-auto max-w-4xl mx-auto">
-        {/* Current Epoch Indicator */}
-        <div className="flex items-center justify-between w-full text-xs font-mono text-neutral-400 px-1">
-          <div className="flex items-center gap-2">
-            <span className="text-white font-medium tracking-wide">
-              {currentEra.title}
-            </span>
-            <span className="text-neutral-500">·</span>
-            <span className="text-neutral-400 text-[11px] font-sans">
-              {currentEra.timeRange}
-            </span>
-          </div>
-
-          <div className="text-[11px] tracking-widest text-neutral-400 tabular-nums">
-            {Math.round(progress * 100)}%
-          </div>
-        </div>
-
-        {/* Minimal Timeline Scrub Bar */}
+      {/* =========================================================================
+          SHOPIFY EDITIONS-STYLE ASYMMETRICAL EDITORIAL NARRATIVE OVERLAY
+          Updates deterministically across 3 sub-stages within each era as user scrolls
+      ========================================================================= */}
+      {showEditorial && (
         <div
-          className="relative w-full h-6 flex items-center cursor-pointer group"
-          onClick={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            const clickPos = (e.clientX - rect.left) / rect.width;
-            onSeek(Math.max(0, Math.min(1, clickPos)));
-          }}
+          className={`w-full px-6 sm:px-12 pb-8 sm:pb-12 flex flex-col ${
+            isRightAligned ? 'items-end' : 'items-start'
+          } transition-all duration-500`}
         >
-          {/* Base track */}
-          <div className="w-full h-1 bg-white/15 rounded-full overflow-hidden transition-all group-hover:h-1.5">
-            <div
-              className="h-full bg-gradient-to-r from-amber-600 via-amber-400 to-sky-400 transition-all duration-75"
-              style={{ width: `${progress * 100}%` }}
-            />
-          </div>
-
-          {/* Era pips */}
-          {ERAS_DATA.map((era, idx) => {
-            const pipPos = idx / (ERAS_DATA.length - 1);
-            const isPassed = progress >= pipPos;
-            const isCurrent = currentIdx === idx;
-            return (
-              <button
-                key={era.id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSeek(pipPos);
-                }}
-                title={era.title}
-                className="absolute -translate-x-1/2 flex flex-col items-center group/pip focus:outline-none"
-                style={{ left: `${pipPos * 100}%` }}
+          {/* Measured Contrast Scrim Container */}
+          <aside
+            className="w-full max-w-lg pointer-events-auto rounded-lg p-6 sm:p-7 bg-gradient-to-t from-black/55 via-black/40 to-black/25 backdrop-blur-xs border border-white/10 shadow-xl transition-all duration-500"
+          >
+            {/* Unboxed Metadata Kicker (Zero-Pill Discipline) */}
+            <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-400 mb-2.5 tracking-wide">
+              <span
+                className="font-semibold text-neutral-200"
+                style={{ color: palette.primaryAccent }}
               >
-                <div
-                  className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
-                    isCurrent
-                      ? 'bg-amber-400 ring-4 ring-amber-400/30 scale-125'
-                      : isPassed
-                      ? 'bg-white/80 group-hover/pip:scale-125'
-                      : 'bg-white/30 group-hover/pip:bg-white/60'
-                  }`}
-                />
-              </button>
-            );
-          })}
+                Chapter {editorial.romanNumeral}
+              </span>
+              <span aria-hidden="true">·</span>
+              <span className="tabular-nums text-neutral-300">{editorial.chronology}</span>
+              <span aria-hidden="true">·</span>
+              <span className="tabular-nums text-neutral-400">
+                {String(sequenceIndex + 1).padStart(2, '0')} / 16
+              </span>
+            </div>
+
+            {/* Expressive Display Headline */}
+            <h1
+              className="font-cinzel text-2xl sm:text-3xl font-semibold text-white tracking-wide leading-snug mb-1.5"
+              style={{ textWrap: 'balance' }}
+            >
+              {editorial.chapterTitle}
+            </h1>
+
+            {/* Regional & Material Provenance */}
+            <p className="text-xs text-neutral-400 mb-5">
+              {editorial.regionContext}
+            </p>
+
+            {/* 3-Beat Progressive Sub-Stage Selector & Progress Hairlines */}
+            <div className="grid grid-cols-3 gap-2 mb-5">
+              {editorial.beats.map((beat, idx) => {
+                const isBeatActive = idx === activeBeatIndex;
+                const isBeatCompleted = idx < activeBeatIndex;
+                const targetBeatProgress = idx === 0 ? 0.08 : idx === 1 ? 0.48 : 0.82;
+
+                return (
+                  <button
+                    key={beat.phaseLabel}
+                    onClick={() =>
+                      scrollToVh(seq.startVh + seq.scrollHeightVh * targetBeatProgress)
+                    }
+                    className="text-left group focus:outline-none"
+                  >
+                    <div className="w-full h-[2px] bg-white/15 mb-2 overflow-hidden">
+                      <div
+                        className="h-full transition-all duration-150"
+                        style={{
+                          width: isBeatCompleted
+                            ? '100%'
+                            : isBeatActive
+                            ? `${Math.max(8, beatLocalProgress * 100)}%`
+                            : '0%',
+                          backgroundColor: palette.primaryAccent,
+                        }}
+                      />
+                    </div>
+                    <span
+                      className={`block text-[11px] font-medium truncate transition-colors ${
+                        isBeatActive
+                          ? 'text-white'
+                          : isBeatCompleted
+                          ? 'text-neutral-300 group-hover:text-white'
+                          : 'text-neutral-500 group-hover:text-neutral-300'
+                      }`}
+                    >
+                      {beat.phaseLabel}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Active Sub-Stage Narrative Prose */}
+            <div className="border-t border-white/10 pt-4">
+              <h2
+                className="text-base font-semibold text-neutral-100 mb-2 leading-snug"
+                style={{ textWrap: 'balance' }}
+              >
+                {activeBeat.subheading}
+              </h2>
+              <p className="text-sm sm:text-[15px] text-neutral-300 leading-relaxed mb-4 font-normal">
+                {activeBeat.body}
+              </p>
+
+              {/* Quiet Unboxed Material & Technical Footnote */}
+              <div className="flex items-center justify-between text-xs text-neutral-400 border-t border-white/10 pt-3">
+                <span className="truncate">{activeBeat.materialDetail}</span>
+                <span className="tabular-nums text-neutral-500 shrink-0 ml-3">
+                  {Math.round(sectionProgress * 100)}%
+                </span>
+              </div>
+            </div>
+          </aside>
         </div>
-      </footer>
+      )}
+
+      {/* =========================================================================
+          SHOPIFY EDITIONS-STYLE CHAPTER INDEX DRAWER
+      ========================================================================= */}
+      {isIndexOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md pointer-events-auto flex justify-end">
+          <div className="w-full max-w-md bg-neutral-950 border-l border-white/10 h-full flex flex-col justify-between p-6 sm:p-8 overflow-y-auto">
+            <div>
+              <div className="flex items-center justify-between pb-5 border-b border-white/10 mb-6">
+                <div>
+                  <span className="font-cinzel text-sm tracking-[0.25em] text-white block">
+                    ERAS CHRONICLE
+                  </span>
+                  <span className="text-xs text-neutral-400">
+                    16 Vertical Chapters · {TOTAL_DOCUMENT_VH.toLocaleString()}vh Total Journey
+                  </span>
+                </div>
+                <button
+                  onClick={() => setIsIndexOpen(false)}
+                  aria-label="Close chapter index"
+                  className="p-2 text-neutral-400 hover:text-white rounded-md border border-white/10"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="divide-y divide-white/10">
+                {HISTORICAL_SEQUENCES.map((item, idx) => {
+                  const isCurrent = idx === sequenceIndex;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        scrollToVh(item.startVh + 25);
+                        setIsIndexOpen(false);
+                      }}
+                      className={`w-full py-3.5 text-left flex items-baseline justify-between gap-4 transition-colors ${
+                        isCurrent ? 'text-white' : 'text-neutral-400 hover:text-neutral-100'
+                      }`}
+                    >
+                      <div className="flex items-baseline gap-3 min-w-0">
+                        <span
+                          className="text-xs font-mono tabular-nums w-7 shrink-0"
+                          style={{
+                            color: isCurrent ? item.palette.primaryAccent : undefined,
+                          }}
+                        >
+                          {item.editorial.romanNumeral}.
+                        </span>
+                        <div className="truncate">
+                          <span className="font-cinzel text-sm font-semibold block truncate">
+                            {item.editorial.chapterTitle}
+                          </span>
+                          <span className="text-xs text-neutral-500 block truncate">
+                            {item.editorial.regionContext}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-xs text-neutral-500 tabular-nums shrink-0">
+                        {item.editorial.chronology}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Right-Edge Vertical Scroll Hairline */}
+      <div className="fixed right-0 top-0 bottom-0 w-[2px] bg-white/10 pointer-events-none">
+        <div
+          className="w-full transition-all duration-75"
+          style={{
+            height: `${Math.min(100, Math.max(0, globalProgress * 100))}%`,
+            backgroundColor: palette.primaryAccent,
+          }}
+        />
+      </div>
     </div>
   );
 };
